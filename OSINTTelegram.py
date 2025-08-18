@@ -15,48 +15,96 @@ def clean_address(addr):
     return ", ".join(part.strip() for part in addr.split(",") if part.strip())
 
 def format_results(data, query, telegram=False):
-    if isinstance(data, dict): data = [data]
-    results = [f"🔍 <b>Results for:</b> <code>{query}</code>\n"] if telegram else []
+    if isinstance(data, dict): 
+        data = [data]
+
+    results = [f"🟢 <b>OSINT Intelligence Report</b>\n══════════════════════════════\n\n📂 <b>Case ID</b> : #{idx}\n🔍 <b>Query</b>   : <code>{query}</code>\n"] if telegram else []
+
     for idx, person in enumerate(data, 1):
         block = f"""
-<b>━━━━━━━━━━━━━━━ 🟢 Person {idx} ━━━━━━━━━━━━━━━</b>
-👤 <b>Name</b>        : <code>{safe_get(person,'name')}</code>
-👔 <b>Father's</b>    : <code>{safe_get(person,'fname')}</code>
-🏡 <b>Address</b>     : <code>{clean_address(safe_get(person,'address'))}</code>
-🌍 <b>Circle</b>      : <code>{safe_get(person,'circle')}</code>
-📱 <b>Mobile</b>      : <code>{safe_get(person,'mobile')}</code>
-📞 <b>Alt Mobile</b>  : <code>{safe_get(person,'alt')}</code>
-🆔 <b>Aadhaar</b>     : <code>{safe_get(person,'id')}</code>
-📧 <b>Email</b>       : <code>{safe_get(person,'email')}</code>
-<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
-⚡ <i>Powered by @H4RSHB0Y</i>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 <b>Identity</b>
+   • Name       : <code>{safe_get(person,'name')}</code>
+   • Father     : <code>{safe_get(person,'fname')}</code>
+
+🏠 <b>Location</b>
+   • Address    : <code>{clean_address(safe_get(person,'address'))}</code>
+   • Circle     : <code>{safe_get(person,'circle')}</code>
+
+📞 <b>Communication</b>
+   • Mobile     : <code>{safe_get(person,'mobile')}</code>
+   • Alt Mobile : <code>{safe_get(person,'alt')}</code>
+   • Email      : <code>{safe_get(person,'email')}</code>
+
+🆔 <b>Identification</b>
+   • Aadhaar    : <code>{safe_get(person,'id')}</code>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ <b>Status</b> : Scan Completed  
+🔒 <i>Session Closed</i>  
+⚡ Powered by @H4RSHB0Y
 """.strip()
         results.append(block)
+
     return "\n\n".join(results)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "✨ <b>Welcome to HARSH - HAXCER OSINT Tool</b>\n\n"
-        "✅ <i>Session Opened</i>\n"
-        "📌 Send me a <b>Mobile</b>, <b>Aadhaar</b>, or <b>Email</b>\n"
-        "and I’ll fetch results instantly. 🚀",
+        "🛰️ <b>[ ACCESS GRANTED ]</b>\n"
+        "══════════════════════════════\n\n"
+        "👋 <b>Welcome, Agent</b>\n"
+        "You are now connected to the <i>HARSH - HAXCER Intelligence Grid</i>.\n\n"
+        "📂 <b>Available Operations:</b>\n"
+        "   • <code>Mobile</code>  → Trace mobile owner\n"
+        "   • <code>Aadhaar</code> → Fetch Aadhaar details\n"
+        "   • <code>Email</code>   → Lookup linked identity\n\n"
+        "💡 <i>Tip:</i> Just send the value (e.g. <code>9876543210</code>) and I’ll run the scan.\n\n"
+        "🔒 <b>Session Status:</b> ACTIVE\n"
+        "⚡ Powered by @H4RSHB0Y",
         parse_mode="HTML"
     )
 
 async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = (update.message.text or "").strip()
-    await update.message.reply_text("⏳ <i>Fetching results...</i>", parse_mode="HTML")
+
+    # Step 1: Acknowledge request
+    await update.message.reply_text(
+        "🛰️ <b>Scan Initiated</b>\n"
+        f"🔍 Query: <code>{query}</code>\n"
+        "⏳ <i>Fetching intelligence data...</i>",
+        parse_mode="HTML"
+    )
+
     try:
         resp = requests.get(f"{API_URL}?apikey={API_KEY}&query={query}", timeout=30)
         payload = resp.json()
     except Exception as e:
-        await update.message.reply_text(f"❌ <b>Error:</b> <code>{e}</code>\n🔒 Session Closed", parse_mode="HTML")
+        await update.message.reply_text(
+            f"❌ <b>Scan Failed</b>\n"
+            f"📂 Reason: <code>{e}</code>\n\n"
+            "🔒 <i>Session Closed</i>",
+            parse_mode="HTML"
+        )
         return
+
     if not payload:
-        await update.message.reply_text("❌ <b>No results found.</b>\n🔒 Session Closed", parse_mode="HTML")
+        await update.message.reply_text(
+            "⚠️ <b>No Records Found</b>\n"
+            "📌 Try another query.\n\n"
+            "🔒 <i>Session Closed</i>",
+            parse_mode="HTML"
+        )
         return
+
+    # Step 2: Show formatted intelligence result
     result_text = format_results(payload, query, telegram=True)
-    await update.message.reply_text(result_text + "\n\n🔒 <i>Session Closed — Thanks for using</i> @H4RSHB0Y", parse_mode="HTML")
+
+    await update.message.reply_text(
+        result_text +
+        "\n\n✅ <b>Scan Complete</b>\n"
+        "🔒 <i>Session Closed — Thank you for using</i> @H4RSHB0Y",
+        parse_mode="HTML"
+    )
 
 def telegram_mode():
     app = Application.builder().token(BOT_TOKEN).build()
