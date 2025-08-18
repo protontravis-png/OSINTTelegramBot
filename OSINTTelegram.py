@@ -66,45 +66,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = (update.message.text or "").strip()
-
-    # Step 1: Acknowledge request
-    await update.message.reply_text(
-        "🛰️ <b>Scan Initiated</b>\n"
-        f"🔍 Query: <code>{query}</code>\n"
-        "⏳ <i>Fetching intelligence data...</i>",
-        parse_mode="HTML"
-    )
-
+    await update.message.reply_text("⏳ <i>Fetching results...</i>", parse_mode="HTML")
     try:
         resp = requests.get(f"{API_URL}?apikey={API_KEY}&query={query}", timeout=30)
         payload = resp.json()
     except Exception as e:
-        await update.message.reply_text(
-            f"❌ <b>Scan Failed</b>\n"
-            f"📂 Reason: <code>{e}</code>\n\n"
-            "🔒 <i>Session Closed</i>",
-            parse_mode="HTML"
-        )
+        await update.message.reply_text(f"❌ <b>Error:</b> <code>{e}</code>\n🔒 Session Closed", parse_mode="HTML")
         return
-
     if not payload:
-        await update.message.reply_text(
-            "⚠️ <b>No Records Found</b>\n"
-            "📌 Try another query.\n\n"
-            "🔒 <i>Session Closed</i>",
-            parse_mode="HTML"
-        )
+        await update.message.reply_text("❌ <b>No results found.</b>\n🔒 Session Closed", parse_mode="HTML")
         return
-
-    # Step 2: Show formatted intelligence result
     result_text = format_results(payload, query, telegram=True)
-
-    await update.message.reply_text(
-        result_text +
-        "\n\n✅ <b>Scan Complete</b>\n"
-        "🔒 <i>Session Closed — Thank you for using</i> @H4RSHB0Y",
-        parse_mode="HTML"
-    )
+    await update.message.reply_text(result_text + "\n\n🔒 <i>Session Closed — Thanks for using</i> @H4RSHB0Y", parse_mode="HTML")
 
 def telegram_mode():
     app = Application.builder().token(BOT_TOKEN).build()
