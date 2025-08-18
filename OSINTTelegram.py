@@ -1,11 +1,24 @@
-import os, requests, sys, json, time
+import os, requests, json, time
+from datetime import datetime
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
-# Load secrets from environment
-API_URL  = os.getenv("API_URL")
-API_KEY  = os.getenv("API_KEY")
+# === Load secrets from env ===
+API_URL   = os.getenv("API_URL")
+API_KEY   = os.getenv("API_KEY")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID  = int(os.getenv("ADMIN_ID", "0"))   # set your chat id in env
+
+# === Usage tracking ===
+user_usage = {}
+DAILY_LIMIT = 3
+
+def reset_usage():
+    """Reset usage counts daily."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    for uid in list(user_usage.keys()):
+        if user_usage[uid]["date"] != today:
+            user_usage[uid] = {"count": 0, "date": today}
 
 def safe_get(d, key): return d.get(key, "N/A") if isinstance(d, dict) else "N/A"
 
@@ -14,9 +27,9 @@ def clean_address(addr):
     addr = addr.replace("!!", ", ").replace("!", ", ")
     return ", ".join(part.strip() for part in addr.split(",") if part.strip())
 
-def format_results(data, query, telegram=False):
+def format_results(data, query):
     if isinstance(data, dict): data = [data]
-    results = [f"🔍 Results for: {query}\n"] if telegram else []
+    results = [f"🔍 Results for: {query}\n"]
     for idx, person in enumerate(data, 1):
         block = f"""
 👤 Person {idx}
@@ -33,26 +46,49 @@ def format_results(data, query, telegram=False):
         results.append(block)
     return "\n\n".join(results)
 
+# === Telegram Handlers ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Welcome to HARSH - HAXCER OSINT Tool\n\n"
         "✅ Session Opened\n"
-        "🔹 Send me a Mobile / Aadhaar / Email and I’ll fetch results."
+        "🔹 Send me a Mobile / Aadhaar / Email to fetch results."
     )
 
 async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_user.id
+    reset_usage()
+
+    # Admin bypass
+    if chat_id != ADMIN_ID:
+        # Initialize usage record if new user
+        if chat_id not in user_usage:
+            user_usage[chat_id] = {"count": 0, "date": datetime.now().strftime("%Y-%m-%d")}
+        # Check limit
+        if user_usage[chat_id]["count"] >= DAILY_LIMIT:
+            await update.message.reply_text("⚠️ Daily limit reached (3 queries per day). Please try again tomorrow.")
+            return
+        # Increment usage
+        user_usage[chat_id]["count"] += 1
+
     query = (update.message.text or "").strip()
+    if not query:
+        await update.message.reply_text("Please send a query.")
+        return
+
     await update.message.reply_text("⏳ Fetching results...")
+
     try:
         resp = requests.get(f"{API_URL}?apikey={API_KEY}&query={query}", timeout=30)
         payload = resp.json()
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {e}\n🔒 Session Closed")
         return
+
     if not payload:
         await update.message.reply_text("❌ No results found.\n🔒 Session Closed")
         return
-    result_text = format_results(payload, query, telegram=True)
+
+    result_text = format_results(payload, query)
     await update.message.reply_text(result_text + "\n\n🔒 Session Closed — Thanks for using @H4RSHB0Y")
 
 def telegram_mode():
