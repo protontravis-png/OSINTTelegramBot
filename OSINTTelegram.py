@@ -1,80 +1,77 @@
-import os, requests, json, time
-from datetime import datetime
+import os
+import requests
+import asyncio
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
-# === Load secrets from env ===
+# === Load Secrets from Environment ===
 API_URL   = os.getenv("API_URL")
 API_KEY   = os.getenv("API_KEY")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID  = int(os.getenv("ADMIN_ID", "0"))   # set your chat id in env
+ADMIN_ID  = int(os.getenv("ADMIN_ID", "0"))   # Admin Telegram Chat ID
 
-# === Usage tracking ===
-user_usage = {}
-DAILY_LIMIT = 3
+# === CLI Colors (for logs only) ===
+GREEN  = "\033[92m"
+RESET  = "\033[0m"
 
-def reset_usage():
-    """Reset usage counts daily."""
-    today = datetime.now().strftime("%Y-%m-%d")
-    for uid in list(user_usage.keys()):
-        if user_usage[uid]["date"] != today:
-            user_usage[uid] = {"count": 0, "date": today}
-
-def safe_get(d, key): return d.get(key, "N/A") if isinstance(d, dict) else "N/A"
+# === Utility Functions ===
+def safe_get(d, key):
+    return d.get(key, "N/A") if isinstance(d, dict) else "N/A"
 
 def clean_address(addr):
-    if not addr or addr == "N/A": return "N/A"
+    if not addr or addr == "N/A":
+        return "N/A"
     addr = addr.replace("!!", ", ").replace("!", ", ")
     return ", ".join(part.strip() for part in addr.split(",") if part.strip())
 
-def format_results(data, query):
-    if isinstance(data, dict): data = [data]
-    results = [f"🔍 Results for: {query}\n"]
+def format_results(data, query, telegram=False):
+    if isinstance(data, dict):
+        data = [data]
+
+    results = [f"🔍 Results for: {query}\n"] if telegram else []
     for idx, person in enumerate(data, 1):
+        name = safe_get(person, "name")
+        father = safe_get(person, "fname")
+        address = clean_address(safe_get(person, "address"))
+        circle = safe_get(person, "circle")
+        mobile = safe_get(person, "mobile")
+        alt_mobile = safe_get(person, "alt")
+        aadhaar = safe_get(person, "id")
+        email = safe_get(person, "email")
+
         block = f"""
 👤 Person {idx}
-📝 Name        : {safe_get(person,'name')}
-👔 Father's    : {safe_get(person,'fname')}
-🏡 Address     : {clean_address(safe_get(person,'address'))}
-🌍 Circle      : {safe_get(person,'circle')}
-📱 Mobile      : {safe_get(person,'mobile')}
-📞 Alt Mobile  : {safe_get(person,'alt')}
-🆔 Aadhaar     : {safe_get(person,'id')}
-📧 Email       : {safe_get(person,'email')}
+📝 Name        : {name}
+👔 Father's    : {father}
+🏡 Address     : {address}
+🌍 Circle      : {circle}
+📱 Mobile      : {mobile}
+📞 Alt Mobile  : {alt_mobile}
+🆔 Aadhaar     : {aadhaar}
+📧 Email       : {email}
 ⚡ Credit      : @H4RSHB0Y
-""".strip()
-        results.append(block)
+"""
+        results.append(block.strip())
     return "\n\n".join(results)
 
-# === Telegram Handlers ===
+# === Handlers ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Welcome to HARSH - HAXCER OSINT Tool\n\n"
         "✅ Session Opened\n"
-        "🔹 Send me a Mobile / Aadhaar / Email to fetch results."
+        "🔹 Send queries like:\n"
+        "   /9876543210 (mobile)\n"
+        "   /example@mail.com (email)\n"
+        "   /123456789012 (Aadhaar)"
     )
 
 async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_user.id
-    reset_usage()
-
-    # Admin bypass
-    if chat_id != ADMIN_ID:
-        # Initialize usage record if new user
-        if chat_id not in user_usage:
-            user_usage[chat_id] = {"count": 0, "date": datetime.now().strftime("%Y-%m-%d")}
-        # Check limit
-        if user_usage[chat_id]["count"] >= DAILY_LIMIT:
-            await update.message.reply_text("⚠️ Daily limit reached (3 queries per day). Please try again tomorrow.")
-            return
-        # Increment usage
-        user_usage[chat_id]["count"] += 1
-
-    query = (update.message.text or "").strip()
-    if not query:
-        await update.message.reply_text("Please send a query.")
+    query = update.message.text.strip()
+    if not query.startswith("/"):
+        await update.message.reply_text("⚠️ Please start queries with `/` (e.g. `/9876543210`).")
         return
 
+    query = query[1:]  # remove "/"
     await update.message.reply_text("⏳ Fetching results...")
 
     try:
@@ -88,16 +85,19 @@ async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ No results found.\n🔒 Session Closed")
         return
 
-    result_text = format_results(payload, query)
+    result_text = format_results(payload, query, telegram=True)
     await update.message.reply_text(result_text + "\n\n🔒 Session Closed — Thanks for using @H4RSHB0Y")
 
-def telegram_mode():
+# === Main Bot Runner ===
+def main():
     app = Application.builder().token(BOT_TOKEN).build()
+
+    # Register handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_query))
-    print("✅ Telegram Bot Running...")
+
+    print(f"{GREEN}✅ Telegram Bot Running...{RESET}")
     app.run_polling()
 
 if __name__ == "__main__":
-    if not BOT_TOKEN: raise RuntimeError("BOT_TOKEN missing")
-    telegram_mode()
+    main()
