@@ -1,13 +1,11 @@
-import os, json, time, sys, requests
+import os, requests, sys, json, time
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
+# Load secrets from environment
 API_URL  = os.getenv("API_URL")
 API_KEY  = os.getenv("API_KEY")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-# Colors (optional)
-GREEN = "\033[92m"; BOLD="\033[1m"; RESET="\033[0m"
 
 def safe_get(d, key): return d.get(key, "N/A") if isinstance(d, dict) else "N/A"
 
@@ -20,24 +18,16 @@ def format_results(data, query, telegram=False):
     if isinstance(data, dict): data = [data]
     results = [f"🔍 Results for: {query}\n"] if telegram else []
     for idx, person in enumerate(data, 1):
-        name = safe_get(person, "name")
-        father = safe_get(person, "fname")
-        address = clean_address(safe_get(person, "address"))
-        circle = safe_get(person, "circle")
-        mobile = safe_get(person, "mobile")
-        alt_mobile = safe_get(person, "alt")
-        aadhaar = safe_get(person, "id")
-        email = safe_get(person, "email")
         block = f"""
 👤 Person {idx}
-📝 Name        : {name}
-👔 Father's    : {father}
-🏡 Address     : {address}
-🌍 Circle      : {circle}
-📱 Mobile      : {mobile}
-📞 Alt Mobile  : {alt_mobile}
-🆔 Aadhaar     : {aadhaar}
-📧 Email       : {email}
+📝 Name        : {safe_get(person,'name')}
+👔 Father's    : {safe_get(person,'fname')}
+🏡 Address     : {clean_address(safe_get(person,'address'))}
+🌍 Circle      : {safe_get(person,'circle')}
+📱 Mobile      : {safe_get(person,'mobile')}
+📞 Alt Mobile  : {safe_get(person,'alt')}
+🆔 Aadhaar     : {safe_get(person,'id')}
+📧 Email       : {safe_get(person,'email')}
 ⚡ Credit      : @H4RSHB0Y
 """.strip()
         results.append(block)
@@ -52,9 +42,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = (update.message.text or "").strip()
-    if not query:
-        await update.message.reply_text("Please send a query.")
-        return
     await update.message.reply_text("⏳ Fetching results...")
     try:
         resp = requests.get(f"{API_URL}?apikey={API_KEY}&query={query}", timeout=30)
@@ -72,12 +59,9 @@ def telegram_mode():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_query))
-    print(f"{GREEN}{BOLD}✅ Telegram Bot Running...{RESET}")
+    print("✅ Telegram Bot Running...")
     app.run_polling()
 
 if __name__ == "__main__":
-    # Simple sanity checks so it fails clearly in logs if vars are missing
-    missing = [k for k in ["API_URL","API_KEY","BOT_TOKEN"] if not os.getenv(k)]
-    if missing:
-        raise RuntimeError(f"Missing environment variables: {', '.join(missing)}")
+    if not BOT_TOKEN: raise RuntimeError("BOT_TOKEN missing")
     telegram_mode()
