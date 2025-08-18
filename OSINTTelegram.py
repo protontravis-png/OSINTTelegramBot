@@ -1,5 +1,4 @@
-import os, requests, json, time
-from datetime import datetime
+import os, requests, json
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
@@ -7,18 +6,10 @@ from telegram.ext import Application, CommandHandler, MessageHandler, ContextTyp
 API_URL   = os.getenv("API_URL")
 API_KEY   = os.getenv("API_KEY")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID  = int(os.getenv("ADMIN_ID", "0"))   # set your chat id in env
+ADMIN_ID  = int(os.getenv("ADMIN_ID", "0"))
 
-# === Usage tracking ===
-user_usage = {}
-DAILY_LIMIT = 3
-
-def reset_usage():
-    """Reset usage counts daily."""
-    today = datetime.now().strftime("%Y-%m-%d")
-    for uid in list(user_usage.keys()):
-        if user_usage[uid]["date"] != today:
-            user_usage[uid] = {"count": 0, "date": today}
+# === Credits system ===
+user_credits = {}   # {chat_id: credits}
 
 def safe_get(d, key): return d.get(key, "N/A") if isinstance(d, dict) else "N/A"
 
@@ -48,32 +39,47 @@ def format_results(data, query):
 
 # === Telegram Handlers ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👋 Welcome to HARSH - HAXCER OSINT Tool\n\n"
-        "✅ Session Opened\n"
-        "🔹 Send me a Mobile / Aadhaar / Email to fetch results."
-    )
+    chat_id = update.effective_user.id
+    credits = user_credits.get(chat_id, 0)
+    if chat_id == ADMIN_ID:
+        msg = "👋 Welcome Admin! ✅ Unlimited access."
+    else:
+        msg = f"👋 Welcome! You currently have 💳 {credits} credits."
+    await update.message.reply_text(msg)
+
+async def add_credits(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_user.id
+    if chat_id != ADMIN_ID:
+        await update.message.reply_text("❌ You are not authorized to use this command.")
+        return
+
+    try:
+        target_id = int(context.args[0])
+        amount = int(context.args[1])
+    except:
+        await update.message.reply_text("⚠️ Usage: /add chat_id amount")
+        return
+
+    user_credits[target_id] = user_credits.get(target_id, 0) + amount
+    await update.message.reply_text(f"✅ Added {amount} credits to {target_id}. Total = {user_credits[target_id]}")
 
 async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_user.id
-    reset_usage()
+    query = (update.message.text or "").strip()
+
+    # Must start with "/"
+    if not query.startswith("/"):
+        await update.message.reply_text("⚠️ Please start your query with '/' (example: /9227344169)")
+        return
+    query = query[1:]  # remove slash
 
     # Admin bypass
     if chat_id != ADMIN_ID:
-        # Initialize usage record if new user
-        if chat_id not in user_usage:
-            user_usage[chat_id] = {"count": 0, "date": datetime.now().strftime("%Y-%m-%d")}
-        # Check limit
-        if user_usage[chat_id]["count"] >= DAILY_LIMIT:
-            await update.message.reply_text("⚠️ Daily limit reached (3 queries per day). Please try again tomorrow.")
+        credits = user_credits.get(chat_id, 0)
+        if credits <= 0:
+            await update.message.reply_text("❌ You have no credits left. Contact admin.")
             return
-        # Increment usage
-        user_usage[chat_id]["count"] += 1
-
-    query = (update.message.text or "").strip()
-    if not query:
-        await update.message.reply_text("Please send a query.")
-        return
+        user_credits[chat_id] = credits - 1
 
     await update.message.reply_text("⏳ Fetching results...")
 
@@ -89,11 +95,16 @@ async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     result_text = format_results(payload, query)
-    await update.message.reply_text(result_text + "\n\n🔒 Session Closed — Thanks for using @H4RSHB0Y")
+    if chat_id == ADMIN_ID:
+        await update.message.reply_text(result_text + "\n\n👑 Unlimited Access")
+    else:
+        credits_left = user_credits.get(chat_id, 0)
+        await update.message.reply_text(result_text + f"\n\n💳 Credits left: {credits_left}")
 
 def telegram_mode():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("add", add_credits))  # admin command
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_query))
     print("✅ Telegram Bot Running...")
     app.run_polling()
