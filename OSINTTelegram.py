@@ -104,9 +104,12 @@ def index():
 
 # ------------------ Main ------------------
 if __name__ == "__main__":
-    # Start Telegram bot in a separate thread
-    threading.Thread(target=start_telegram_bot, daemon=True).start()
+    # Start Flask server in a separate thread
+    def run_flask():
+        logging.info(f"Starting Flask server on port {PORT}")
+        app.run(host="0.0.0.0", port=PORT)
     
-    # Start Flask server to satisfy Render Web Service
-    logging.info(f"Starting Flask server on port {PORT}")
-    app.run(host="0.0.0.0", port=PORT)
+    threading.Thread(target=run_flask, daemon=True).start()
+
+    # Run Telegram bot in main thread (guaranteed to respond)
+    start_telegram_bot()
