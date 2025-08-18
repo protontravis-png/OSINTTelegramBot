@@ -1,4 +1,4 @@
-import os, requests, threading, logging, time
+import os, requests, threading, logging
 from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
@@ -83,18 +83,16 @@ async def handle_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     result_text = format_results(payload, query, telegram=True)
     await update.message.reply_text(result_text + "\n\n🔒 <i>Session Closed — Thanks for using</i> @H4RSHB0Y", parse_mode="HTML")
 
-# ------------------ Start Telegram Bot with Auto-Retry ------------------
+# ------------------ Start Telegram Bot ------------------
 def start_telegram_bot():
-    while True:
-        try:
-            app = Application.builder().token(BOT_TOKEN).build()
-            app.add_handler(CommandHandler("start", start))
-            app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_query))
-            logging.info("✅ Telegram Bot Running...")
-            app.run_polling()
-        except Exception as e:
-            logging.error(f"Telegram bot crashed: {e}. Restarting in 5 seconds...")
-            time.sleep(5)  # wait before retrying
+    try:
+        app = Application.builder().token(BOT_TOKEN).build()
+        app.add_handler(CommandHandler("start", start))
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_query))
+        logging.info("✅ Telegram Bot Running...")
+        app.run_polling()
+    except Exception as e:
+        logging.critical(f"Telegram bot failed to start: {e}")
 
 # ------------------ Flask Dummy Server (Render requirement) ------------------
 app = Flask(__name__)
