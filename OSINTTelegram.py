@@ -15,52 +15,31 @@ def clean_address(addr):
     return ", ".join(part.strip() for part in addr.split(",") if part.strip())
 
 def format_results(data, query, telegram=False):
-    if isinstance(data, dict): 
-        data = [data]
-
-    results = [f"🟢 <b>OSINT Intelligence Report</b>\n══════════════════════════════\n\n📂 <b>Case ID</b> : #{idx}\n🔍 <b>Query</b>   : <code>{query}</code>\n"] if telegram else []
-
+    if isinstance(data, dict): data = [data]
+    results = [f"🔍 <b>Results for:</b> <code>{query}</code>\n"] if telegram else []
     for idx, person in enumerate(data, 1):
         block = f"""
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-👤 <b>Identity</b>
-   • Name       : <code>{safe_get(person,'name')}</code>
-   • Father     : <code>{safe_get(person,'fname')}</code>
-
-🏠 <b>Location</b>
-   • Address    : <code>{clean_address(safe_get(person,'address'))}</code>
-   • Circle     : <code>{safe_get(person,'circle')}</code>
-
-📞 <b>Communication</b>
-   • Mobile     : <code>{safe_get(person,'mobile')}</code>
-   • Alt Mobile : <code>{safe_get(person,'alt')}</code>
-   • Email      : <code>{safe_get(person,'email')}</code>
-
-🆔 <b>Identification</b>
-   • Aadhaar    : <code>{safe_get(person,'id')}</code>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-✅ <b>Status</b> : Scan Completed  
-🔒 <i>Session Closed</i>  
-⚡ Powered by @H4RSHB0Y
+<b>━━━━━━━━━━━━━━━ 🟢 Person {idx} ━━━━━━━━━━━━━━━</b>
+👤 <b>Name</b>        : <code>{safe_get(person,'name')}</code>
+👔 <b>Father's</b>    : <code>{safe_get(person,'fname')}</code>
+🏡 <b>Address</b>     : <code>{clean_address(safe_get(person,'address'))}</code>
+🌍 <b>Circle</b>      : <code>{safe_get(person,'circle')}</code>
+📱 <b>Mobile</b>      : <code>{safe_get(person,'mobile')}</code>
+📞 <b>Alt Mobile</b>  : <code>{safe_get(person,'alt')}</code>
+🆔 <b>Aadhaar</b>     : <code>{safe_get(person,'id')}</code>
+📧 <b>Email</b>       : <code>{safe_get(person,'email')}</code>
+<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
+⚡ <i>Powered by @H4RSHB0Y</i>
 """.strip()
         results.append(block)
-
     return "\n\n".join(results)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🛰️ <b>[ ACCESS GRANTED ]</b>\n"
-        "══════════════════════════════\n\n"
-        "👋 <b>Welcome, Agent</b>\n"
-        "You are now connected to the <i>HARSH - HAXCER Intelligence Grid</i>.\n\n"
-        "📂 <b>Available Operations:</b>\n"
-        "   • <code>Mobile</code>  → Trace mobile owner\n"
-        "   • <code>Aadhaar</code> → Fetch Aadhaar details\n"
-        "   • <code>Email</code>   → Lookup linked identity\n\n"
-        "💡 <i>Tip:</i> Just send the value (e.g. <code>9876543210</code>) and I’ll run the scan.\n\n"
-        "🔒 <b>Session Status:</b> ACTIVE\n"
-        "⚡ Powered by @H4RSHB0Y",
+        "✨ <b>Welcome to HARSH - HAXCER OSINT Tool</b>\n\n"
+        "✅ <i>Session Opened</i>\n"
+        "📌 Send me a <b>Mobile</b>, <b>Aadhaar</b>, or <b>Email</b>\n"
+        "and I’ll fetch results instantly. 🚀",
         parse_mode="HTML"
     )
 
