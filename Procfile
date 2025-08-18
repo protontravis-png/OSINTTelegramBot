@@ -1,0 +1,1 @@
+worker: python OSINTTelegram.py
